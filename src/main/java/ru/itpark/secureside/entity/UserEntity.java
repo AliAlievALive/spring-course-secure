@@ -1,40 +1,46 @@
 package ru.itpark.secureside.entity;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-import ru.itpark.secureside.domain.User;
+import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.UpdateTimestamp;
+import ru.itpark.secureside.dto.Role;
 
 import javax.persistence.*;
-import java.util.Collection;
-import java.util.Collections;
+import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
+@Table(name = "user", schema = "public")
 @Data
-public class UserEntity implements UserDetails {
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private long id;
-  private String name;
-  @Column(nullable = false, unique = true)
-  private String username;
-  @Column(nullable = false)
-  private String password;
-  @ElementCollection(fetch = FetchType.EAGER)
-  // Authority -> Enum -> String
-  private Collection<GrantedAuthority> authorities = Collections.emptyList();
-  boolean accountNonExpired;
-  boolean accountNonLocked;
-  boolean credentialsNonExpired;
-  boolean enabled;
+@EqualsAndHashCode
+public class UserEntity {
 
-  public User toUser() {
-    return new User(
-        id, name, username, "***", authorities, accountNonExpired, accountNonLocked, credentialsNonExpired, enabled
-    );
-  }
+    @Id
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    private UUID id;
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDate createDate;
+
+    @UpdateTimestamp
+    private LocalDate modificationDate;
+
+    private String firstName;
+
+    private String lastName;
+
+    private String middleName;
+
+    @Column(unique = true)
+    private String login;
+
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
 }

@@ -4,8 +4,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import ru.itpark.secureside.entity.UserEntity;
 
 import java.util.Optional;
+import java.util.UUID;
 
-// SimpleJpaRepository
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
-  Optional<UserEntity> findByUsername(String username);
+public interface AuthRepository extends JpaRepository<UserEntity, UUID> {
+
+    Optional<UserEntity> findOneByLogin(String login);
+
 }

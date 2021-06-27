@@ -1,68 +1,67 @@
 package ru.itpark.secureside.configuration;
 
-import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import ru.itpark.secureside.domain.User;
-import ru.itpark.secureside.filter.XTokenFilter;
-import ru.itpark.secureside.security.TokenGenerator;
-import ru.itpark.secureside.service.UserService;
+import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationProvider;
+import org.springframework.security.web.authentication.preauth.RequestHeaderAuthenticationFilter;
+import ru.itpark.secureside.configuration.userdetails.AuthUserDetailsService;
 
-import java.util.List;
-import java.util.Random;
+import java.util.Collections;
 
-@Configuration
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+
 @EnableWebSecurity
+@RequiredArgsConstructor
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
-  @Setter(onMethod_ = {@Autowired})
-  private UserService userService;
 
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
-    http
-        .csrf().disable()
-        .logout().disable()
-        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-        .and()
-        .addFilterAfter(new XTokenFilter(userService), BasicAuthenticationFilter.class)
-        .anonymous(configurer -> configurer.principal(new User(
-            -1,
-            "anonymous",
-            "anonymous",
-            "***",
-            List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")),
-            true,
-            true,
-            true,
-            true
-        )).authorities(List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))))
-        .authorizeRequests()
-        // TODO: check
-        .antMatchers(HttpMethod.POST, "/api/users/register", "/api/users/restore").anonymous()
-        .antMatchers(HttpMethod.POST, "/api/users/register/confirm", "/api/users/restore/confirm").anonymous()
-        .antMatchers("/api/**").authenticated()
-    ;
-  }
+    private final AuthUserDetailsService authUserDetailsService;
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-  @Bean
-  public TokenGenerator tokenGenerator() {
-    return new TokenGenerator(new Random(0), 64);
-  }
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http.sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .addFilterAfter(preAuthenticationFilter(), RequestHeaderAuthenticationFilter.class)
+                .csrf().disable()
+                .formLogin().disable()
+                .httpBasic().disable()
+                .logout().disable();
+    }
+
+    private RequestHeaderAuthenticationFilter preAuthenticationFilter() {
+        RequestHeaderAuthenticationFilter preAuthenticationFilter = new RequestHeaderAuthenticationFilter();
+        preAuthenticationFilter.setPrincipalRequestHeader(AUTHORIZATION);
+        preAuthenticationFilter.setAuthenticationManager(authenticationManager());
+        preAuthenticationFilter.setExceptionIfHeaderMissing(false);
+        return preAuthenticationFilter;
+    }
+
+    @Override
+    protected AuthenticationManager authenticationManager() {
+        return new ProviderManager(Collections.singletonList(authenticationProvider()));
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        PreAuthenticatedAuthenticationProvider authenticationProvider = new PreAuthenticatedAuthenticationProvider();
+        authenticationProvider.setPreAuthenticatedUserDetailsService(authUserDetailsService);
+        authenticationProvider.setThrowExceptionWhenTokenRejected(false);
+        return authenticationProvider;
+    }
 }
